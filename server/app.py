@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from flask import Flask, make_response, jsonify, session
+from flask_restful import Api, Resource
 from flask_migrate import Migrate
 
 from models import db, Article, User
@@ -15,20 +16,36 @@ migrate = Migrate(app, db)
 
 db.init_app(app)
 
-@app.route('/clear')
-def clear_session():
-    session['page_views'] = 0
-    return {'message': '200: Successfully cleared session data.'}, 200
+api = Api(app)
 
-@app.route('/articles')
-def index_articles():
+class Clear(Resource):
+    def get(self):
+        session['page_views'] = 0
+        return {'message': '200: Successfully cleared session data.'}, 200
 
-    pass
+api.add_resource(Clear, '/clear')
 
-@app.route('/articles/<int:id>')
-def show_article(id):
+class Articles(Resource):
 
-    pass
+    def get(self):
+
+        articles = [article.to_dict() for article in Article.query.all()]
+        return articles, 200
+    
+api.add_resource(Articles, '/articles')
+
+class ArticleByID(Resource):
+
+    def get(self, id):
+
+        session['page_views'] = session.get('page_views') or 0
+        session['page_views'] += 1
+        article = Article.query.filter_by(id=id).first().to_dict()
+        if session['page_views'] <= 3:
+            return article, 200
+        return {'message':'Maximum pageview limit reached'}, 401
+
+api.add_resource(ArticleByID, '/articles/<int:id>')
 
 if __name__ == '__main__':
-    app.run(port=5555)
+    app.run(port=5555, debug=True)
